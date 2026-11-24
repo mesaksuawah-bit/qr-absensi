@@ -8,6 +8,11 @@ const cfg = {
 };
 export const isCloud = Boolean(cfg.projectId && cfg.apiKey);
 
+// Jam acuan bersama: di mode cloud memakai jam server Firebase agar HP & laptop
+// yang jamnya berbeda tetap konsisten. Di mode lokal = jam perangkat.
+let offset = 0;
+export const now = () => Date.now() + offset;
+
 // ---------- Adapter lokal (localStorage) ----------
 const K = 'qr-absensi-v1';
 const read = () => {
@@ -50,6 +55,13 @@ async function cloud() {
     patch: (c, id, fields) => F.updateDoc(F.doc(fs, c, id), fields),
     watch: (c, id, cb) => F.onSnapshot(F.doc(fs, c, id), (s) => cb(s.exists() ? s.data() : null)),
   };
+  try {
+    const ref = F.doc(fs, 'meta', 'clock');
+    const t0 = Date.now();
+    await F.setDoc(ref, { t: F.serverTimestamp() });
+    const snap = await F.getDoc(ref);
+    offset = snap.data().t.toMillis() - (t0 + Date.now()) / 2;
+  } catch { /* tetap pakai jam perangkat */ }
   if (!(await a.list('courses')).length) {
     for (const [k, v] of Object.entries(seed.courses)) await a.set('courses', k, v);
     for (const [k, v] of Object.entries(seed.students)) await a.set('students', k, v);

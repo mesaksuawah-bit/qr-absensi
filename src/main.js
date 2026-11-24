@@ -1,6 +1,6 @@
 import './style.css';
 import QRCode from 'qrcode';
-import { initDb, isCloud } from './store.js';
+import { initDb, isCloud, now } from './store.js';
 import { USERS } from './seed.js';
 
 const LATE_MIN = 15; // lewat 15 menit dari sesi dibuka => Terlambat
@@ -12,7 +12,7 @@ let stop = () => {};
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const user = () => JSON.parse(sessionStorage.getItem('user') || 'null');
 const hhmm = (t) => new Date(t).toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
-const isActive = (s) => !s.closed && Date.now() < s.expiresAt;
+const isActive = (s) => !s.closed && now() < s.expiresAt;
 
 function shell(html, u = user()) {
   app.innerHTML = `<header class="bar"><span>Sistem Absensi Mahasiswa Berbasis QR Code</span>
@@ -55,8 +55,8 @@ async function dosen() {
     const c = courses.find((x) => x.id === $('c').value);
     const mins = Math.max(1, Number($('m').value) || 30);
     const token = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
-    const now = Date.now();
-    await db.set('sessions', token, { token, courseId: c.id, courseName: c.nama, openedAt: now, expiresAt: now + mins * 60000, closed: false, records: {} });
+    const t = now();
+    await db.set('sessions', token, { token, courseId: c.id, courseName: c.nama, openedAt: t, expiresAt: t + mins * 60000, closed: false, records: {} });
     location.hash = `#/sesi/${token}`;
   };
 }
@@ -100,7 +100,7 @@ async function absen(token) {
       : done ? ''
       : isActive(s) ? `<label>Masukkan NIM</label><input id="nim" inputmode="numeric" placeholder="contoh: 2201001" autocomplete="off">
           <button id="go" class="btn">Kirim Absensi</button>`
-      : '<div class="alert err">Sesi absensi sudah ditutup atau kedaluwarsa.</div>'}</section>`, null);
+      : `<div class="alert err">${s.closed ? 'Sesi absensi sudah ditutup oleh dosen.' : 'Masa berlaku QR sudah habis.'}</div>`}</section>`, null);
   draw();
   const bind = () => {
     if (!$('go')) return;
@@ -111,11 +111,11 @@ async function absen(token) {
       if (!isActive(s)) { draw(); return bind(); }
       if (!st) { draw(`<div class="alert err">NIM ${esc(nim) || 'kosong'} tidak terdaftar.</div>`); return bind(); }
       if (s.records?.[nim]) { draw(`<div class="alert err">${esc(st.nama)} sudah absen pada sesi ini.</div>`); return bind(); }
-      const now = Date.now();
-      const status = now - s.openedAt > LATE_MIN * 60000 ? 'Terlambat' : 'Hadir';
-      await db.patch('sessions', token, { [`records.${nim}`]: { time: now, status } });
+      const t = now();
+      const status = t - s.openedAt > LATE_MIN * 60000 ? 'Terlambat' : 'Hadir';
+      await db.patch('sessions', token, { [`records.${nim}`]: { time: t, status } });
       done = true;
-      draw(`<div class="alert ok">Berhasil! ${esc(st.nama)} tercatat ${status} pukul ${hhmm(now)}.</div>`);
+      draw(`<div class="alert ok">Berhasil! ${esc(st.nama)} tercatat ${status} pukul ${hhmm(t)}.</div>`);
     };
     $('go').onclick = send;
     $('nim').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
