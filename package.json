@@ -1,0 +1,9 @@
+{
+  "name": "qr-absensi-mahasiswa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "dependencies": { "firebase": "^10.14.0", "qrcode": "^1.5.4" },
+  "devDependencies": { "vite": "^5.4.0" }
+}
